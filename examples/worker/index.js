@@ -8,7 +8,7 @@ let broker = new ServiceBroker({ logger: console });
 broker.createService({
 	name: "task-worker",
 	mixins: [AMQPMixin()],
-	queues: {
+	AMQPQueues: {
 		"sample.task" (channel, msg) {
 			let job = JSON.parse(msg.content.toString());
 			this.logger.info("New job received!", job.id);

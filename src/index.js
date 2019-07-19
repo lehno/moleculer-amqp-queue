@@ -6,49 +6,16 @@
 
 "use strict";
 
-const _ = require("lodash");
 const amqp = require("amqplib");
+const _ = require("lodash");
 let AMQPConn = null;
 
-module.exports = function createService (url) {
-
-	/**
-	 * Task queue mixin service for AMQP
-	 *
-	 * @name moleculer-amqp-queue
-	 * @module Service
-	 */
+module.exports = function (url) {
 	return {
-		name: "amqp-queue",
-
-		/**
-		 * Settings
-		 */
 		settings: {
 			url: url || "amqp://localhost"
 		},
-
-		/**
-		 * Methods
-		 */
 		methods: {
-			/**
-			 * Create a new job
-			 *
-			 * @param {String} name
-			 * @param {any} message
-			 */
-			async addAMQPJob (name, message) {
-				let queue = await this.getAMQPQueue(name);
-				queue.sendToQueue(name, Buffer.from(JSON.stringify(message)), { persistent: true });
-			},
-
-			/**
-			 * Get a queue by name
-			 *
-			 * @param {String} name
-			 * @returns {Promise<*>}
-			 */
 			async getAMQPQueue (name) {
 				if (!this.$queues[name]) {
 					try {
@@ -68,19 +35,15 @@ module.exports = function createService (url) {
 					}
 				}
 				return this.$queues[name];
-			}
+			},
+			async addAMQPJob (name, message) {
+				let queue = await this.getAMQPQueue(name);
+				queue.sendToQueue(name, Buffer.from(JSON.stringify(message)), { persistent: true });
+			},
 		},
-
-		/**
-		 * Service created lifecycle event handler
-		 */
 		created () {
 			this.$queues = {};
 		},
-
-		/**
-		 * Service started lifecycle event handler
-		 */
 		async started () {
 			if (!this.settings.url) {
 				return this.Promise.reject("Missing options URL");
@@ -98,7 +61,6 @@ module.exports = function createService (url) {
 				this.logger.error(err);
 				return this.Promise.reject("Unable to connect to AMQP");
 			}
-
 		}
 	};
 };

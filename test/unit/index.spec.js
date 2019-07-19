@@ -3,12 +3,12 @@
 jest.mock("amqplib");
 
 let consumeCB = jest.fn();
-let sendToQueueCB = jest.fn();
+let addAMQPJob = jest.fn();
 
 let Queue = require("amqplib");
 Queue.mockImplementation(() => ({
 	consume: consumeCB,
-	sendToQueue: sendToQueueCB
+	addAMQPJob: addAMQPJob
 }));
 
 const { ServiceBroker } = require("moleculer");
@@ -32,7 +32,7 @@ describe("Test AMQPService started handler", () => {
 	const service = broker.createService({
 		mixins: [AMQPService(opts)],
 
-		queues: {
+		AMQPQueues: {
 			"task.first": jest.fn(),
 			"task.second": jest.fn(),
 		}
@@ -64,15 +64,15 @@ describe("Test AMQPService created handler", () => {
 	});
 
 	it("should be call getQueue", () => {
-		service.getQueue = jest.fn(() => ({ createJob: sendToQueueCB }));
+		service.getQueue = jest.fn(() => ({ createJob: addAMQPJob }));
 
 		service.createJob("task.first", payload);
 
 		expect(service.getQueue).toHaveBeenCalledTimes(1);
 		expect(service.getQueue).toHaveBeenCalledWith("task.first");
 
-		expect(sendToQueueCB).toHaveBeenCalledTimes(1);
-		expect(sendToQueueCB).toHaveBeenCalledWith(payload);
+		expect(addAMQPJob).toHaveBeenCalledTimes(1);
+		expect(addAMQPJob).toHaveBeenCalledWith(payload);
 	});
 
 });
