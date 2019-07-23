@@ -5,11 +5,13 @@
 
 const amqp = require("amqplib");
 
+const callbacks = {};
+
 const mockChannel = {
 	consume: jest.fn(),
 	assertQueue: jest.fn(),
 	prefetch: jest.fn(),
-	on: jest.fn(),
+	on: jest.fn((name, cb) => callbacks[name] = cb),
 	sendToQueue: jest.fn()
 };
 
@@ -160,6 +162,15 @@ describe("Test AMQPService getAMQPQueue method", () => {
 		expect(service.$queues).toEqual({
 			"test1": mockChannel
 		})
+	});
+
+	it("should remove queue if channel is closed", async () => {
+		const channel = await service.getAMQPQueue("test1");
+		expect(channel).toBe(mockChannel);
+
+		callbacks.close();
+
+		expect(service.$queues).toEqual({})
 	});
 
 });

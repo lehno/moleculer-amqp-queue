@@ -26,6 +26,7 @@ module.exports = {
 						delete this.$queues[name];
 					});
 					channel.on("error", (err) => {
+						/* istanbul ignore next */
 						this.logger.error(err);
 					});
 					await channel.assertQueue(name, { durable: true });
@@ -33,7 +34,7 @@ module.exports = {
 					this.$queues[name] = channel;
 				} catch (err) {
 					this.logger.error(err);
-					return this.Promise.reject("Unable to start queue");
+					throw(MoleculerError("Unable to start queue"));
 				}
 			}
 			return this.$queues[name];
@@ -61,7 +62,7 @@ module.exports = {
 					channel.consume(name, fn.bind(this, channel), { noAck: false });
 				});
 			}
-			
+
 		} catch (err) {
 			this.logger.error(err);
 			throw Errors.MoleculerError("Unable to connect to AMQP");
