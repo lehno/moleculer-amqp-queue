@@ -1,26 +1,58 @@
 "use strict";
 
-jest.mock("amqplib");
+//let consumeCB = jest.fn();
+//let addAMQPJob = jest.fn();
 
-let consumeCB = jest.fn();
-let addAMQPJob = jest.fn();
+const amqp = require("amqplib");
 
-let Queue = require("amqplib");
-Queue.mockImplementation(() => ({
-	consume: consumeCB,
-	addAMQPJob: addAMQPJob
-}));
+const callbacks = {};
+
+const mockChannel = {
+	consume: jest.fn(),
+	assertQueue: jest.fn(),
+	prefetch: jest.fn(),
+	on: jest.fn((name, cb) => callbacks[name] = cb),
+	sendToQueue: jest.fn()
+};
+
+const mockConnection = {
+	createChannel: jest.fn(() => mockChannel)
+};
+
+amqp.connect = jest.fn(() => mockConnection);
 
 const { ServiceBroker } = require("moleculer");
+const { ServiceSchemaError } = require("moleculer").Errors;
 const AMQPService = require("../../src");
 
 describe("Test AMQPService constructor", () => {
-	const broker = new ServiceBroker({ logger: false });
-	const service = broker.createService(AMQPService());
 
-	it("should be created", () => {
+	it("should be created with default settings", () => {
+		const broker = new ServiceBroker({ logger: false });
+		const service = broker.createService(AMQPService);
+		
 		expect(service).toBeDefined();
-		expect(service.$queues).toBeDefined();
+		expect(service.settings).toEqual({
+			url: "amqp://localhost"
+		});
+		expect(service.AMQPConn).toBeDefined();
+		expect(service.$queues).toEqual({});
+	});
+
+	it("should be created with custom settings", () => {
+		const broker = new ServiceBroker({ logger: false });
+		const service = broker.createService(AMQPService, {
+			settings: {
+				url: "amqp://rabbitmq/"
+			}
+		});
+
+		expect(service).toBeDefined();
+		expect(service.settings).toEqual({
+			url: "amqp://rabbitmq/"
+		});
+		expect(service.AMQPConn).toBeDefined();
+		expect(service.$queues).toEqual({});
 	});
 
 });
@@ -29,50 +61,139 @@ describe("Test AMQPService started handler", () => {
 	const opts = {};
 
 	const broker = new ServiceBroker({ logger: false });
-	const service = broker.createService({
-		mixins: [AMQPService(opts)],
+	const service = broker.createService(AMQPService, {
+		settings: {
+			url: "amqp://rabbitmq"
+		},
 
 		AMQPQueues: {
 			"task.first": jest.fn(),
 			"task.second": jest.fn(),
 		}
 	});
+	
+	service.getAMQPQueue = jest.fn(() => mockChannel);
 
-	beforeAll(() => service._start());
+	beforeAll(() => broker.start());
+	afterAll(() => broker.stop());
 
-	it("should be created queues", () => {
-		expect(service).toBeDefined();
-		expect(Object.keys(service.$queues).length).toBe(2);
-		expect(service.$queues["task.first"]).toBeDefined();
-		expect(service.$queues["task.second"]).toBeDefined();
+	it("should create AMQP connection & queues", () => {
 
-		expect(Queue).toHaveBeenCalledTimes(2);
-		expect(Queue).toHaveBeenCalledWith("task.first", opts);
-		expect(Queue).toHaveBeenCalledWith("task.second", opts);
+		expect(service.AMQPConn).toBe(mockConnection);
 
-		expect(consumeCB).toHaveBeenCalledTimes(2);
+		expect(service.getAMQPQueue).toHaveBeenCalledTimes(2);
+		expect(service.getAMQPQueue).toHaveBeenCalledWith("task.first");
+		expect(service.getAMQPQueue).toHaveBeenCalledWith("task.second");
+
+		expect(mockChannel.consume).toHaveBeenCalledTimes(2);
+		expect(mockChannel.consume).toHaveBeenCalledWith("task.first", expect.any(Function), { noAck: false });
+		expect(mockChannel.consume).toHaveBeenCalledWith("task.second", expect.any(Function), { noAck: false });
+	});
+
+	it("should throw error if URL is not defined", () => {
+		const broker = new ServiceBroker({ logger: false });
+		const service = broker.createService(AMQPService, {
+			settings: {
+				url: null
+			},
+
+			AMQPQueues: {
+				"task.first": jest.fn(),
+				"task.second": jest.fn(),
+			}
+		});
+
+		expect(broker.start()).rejects.toBeInstanceOf(ServiceSchemaError);
+		return broker.stop();
 	});
 
 });
 
-describe("Test AMQPService created handler", () => {
+describe("Test AMQPService getAMQPQueue method", () => {
 	const payload = { a: 10 };
 
 	const broker = new ServiceBroker({ logger: false });
-	const service = broker.createService({
-		mixins: [AMQPService()]
+	const service = broker.createService(AMQPService);
+
+	beforeAll(() => broker.start());
+	afterAll(() => broker.stop());
+
+	it("should be create queue", async () => {
+		expect(service.$queues).toEqual({});
+		mockConnection.createChannel.mockClear();
+
+		const channel = await service.getAMQPQueue("test1");
+
+		expect(channel).toBe(mockChannel);
+
+		expect(mockConnection.createChannel).toHaveBeenCalledTimes(1);
+		expect(mockConnection.createChannel).toHaveBeenCalledWith();
+
+		expect(channel.on).toHaveBeenCalledTimes(2);
+		expect(channel.on).toHaveBeenCalledWith("close", expect.any(Function));
+		expect(channel.on).toHaveBeenCalledWith("error", expect.any(Function));
+
+		expect(channel.assertQueue).toHaveBeenCalledTimes(1);
+		expect(channel.assertQueue).toHaveBeenCalledWith("test1", { durable: true });
+
+		expect(channel.prefetch).toHaveBeenCalledTimes(1);
+		expect(channel.prefetch).toHaveBeenCalledWith(1);
+
+		expect(service.$queues).toEqual({
+			"test1": mockChannel
+		})
 	});
 
-	it("should be call getQueue", () => {
-		service.getQueue = jest.fn(() => ({ createJob: addAMQPJob }));
+	it("should not create the same queue again", async () => {
+		mockConnection.createChannel.mockClear();
+		mockChannel.on.mockClear();
+		mockChannel.assertQueue.mockClear();
+		mockChannel.prefetch.mockClear();
 
-		service.createJob("task.first", payload);
+		const channel = await service.getAMQPQueue("test1");
 
-		expect(service.getQueue).toHaveBeenCalledTimes(1);
-		expect(service.getQueue).toHaveBeenCalledWith("task.first");
+		expect(channel).toBe(mockChannel);
 
-		expect(addAMQPJob).toHaveBeenCalledTimes(1);
-		expect(addAMQPJob).toHaveBeenCalledWith(payload);
+		expect(mockConnection.createChannel).toHaveBeenCalledTimes(0);
+		expect(channel.on).toHaveBeenCalledTimes(0);
+		expect(channel.assertQueue).toHaveBeenCalledTimes(0);
+		expect(channel.prefetch).toHaveBeenCalledTimes(0);
+
+		expect(service.$queues).toEqual({
+			"test1": mockChannel
+		})
+	});
+
+	it("should remove queue if channel is closed", async () => {
+		const channel = await service.getAMQPQueue("test1");
+		expect(channel).toBe(mockChannel);
+
+		callbacks.close();
+
+		expect(service.$queues).toEqual({})
+	});
+
+});
+
+describe("Test AMQPService addAMQPJob method", () => {
+	const payload = { a: 10 };
+
+	const broker = new ServiceBroker({ logger: false });
+	const service = broker.createService(AMQPService);
+	service.getAMQPQueue = jest.fn(() => mockChannel);
+
+	beforeAll(() => broker.start());
+	afterAll(() => broker.stop());
+
+	it("should be send job to queue", async () => {
+		const message = { a: 5 };
+		await service.addAMQPJob("job1", message)
+
+		expect(service.getAMQPQueue).toHaveBeenCalledTimes(1);
+		expect(service.getAMQPQueue).toHaveBeenCalledWith("job1");
+
+		expect(mockChannel.sendToQueue).toHaveBeenCalledTimes(1);
+		expect(mockChannel.sendToQueue).toHaveBeenCalledWith("job1", Buffer.from("{\"a\":5}"), { persistent: true });
 	});
 
 });
