@@ -8,7 +8,6 @@
 
 const amqp = require("amqplib");
 const _ = require("lodash");
-let AMQPConn = null;
 
 module.exports = function (url) {
 	return {
@@ -19,7 +18,7 @@ module.exports = function (url) {
 			async getAMQPQueue (name) {
 				if (!this.$queues[name]) {
 					try {
-						let channel = await AMQPConn.createChannel();
+						let channel = await this.AMQPConn.createChannel();
 						channel.on("close", () => {
 							delete this.$queues[name];
 						});
@@ -42,6 +41,7 @@ module.exports = function (url) {
 			},
 		},
 		created () {
+			this.AMQPConn = null;
 			this.$queues = {};
 		},
 		async started () {
@@ -49,7 +49,7 @@ module.exports = function (url) {
 				return this.Promise.reject("Missing options URL");
 			}
 			try {
-				AMQPConn = await amqp.connect(this.settings.url);
+				this.AMQPConn = await amqp.connect(this.settings.url);
 				if (this.schema.AMQPQueues) {
 					_.forIn(this.schema.AMQPQueues, async (fn, name) => {
 						let channel = await this.getAMQPQueue(name);
