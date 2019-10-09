@@ -65,7 +65,7 @@ module.exports = {
 
 		} catch (err) {
 			this.logger.error(err);
-			throw Errors.MoleculerError("Unable to connect to AMQP");
+			throw new Errors.MoleculerError("Unable to connect to AMQP");
 		}
 	}
 };
