@@ -67,8 +67,12 @@ describe("Test AMQPService started handler", () => {
 		},
 
 		AMQPQueues: {
-			"task.first": jest.fn(),
-			"task.second": jest.fn(),
+			"task.first": {
+				handler: jest.fn(),
+			},
+			"task.second": {
+				handler: jest.fn(),
+			},
 		}
 	});
 	
@@ -98,8 +102,12 @@ describe("Test AMQPService started handler", () => {
 			},
 
 			AMQPQueues: {
-				"task.first": jest.fn(),
-				"task.second": jest.fn(),
+				"task.first": {
+					handler: jest.fn(),
+				},
+				"task.second": {
+					handler: jest.fn(),
+				},
 			}
 		});
 

@@ -20,12 +20,23 @@ broker.createService({
 	name: "task-worker",
 	mixins: [AMQPMixin],
 	AMQPQueues: {
-		"sample.task" (channel, msg) {
-			let job = JSON.parse(msg.content.toString());
-			this.logger.info("New job received!", job.id);
-			setTimeout(() => {
-				channel.ack(msg);
-			}, 500);
+		"sample.task": {
+			handler (channel, msg) {
+				let job = JSON.parse(msg.content.toString());
+				this.logger.info("New job received!", job.id);
+				setTimeout(() => {
+					channel.ack(msg);
+				}, 500);
+			},
+			channel: {
+				assert: {
+					durable: true,
+				},
+				prefetch: 1,
+			},
+			consume: {
+				noAck: false,
+			},
 		}
 	}
 });
@@ -40,6 +51,9 @@ broker.createService({
     mixins: [QueueService],
     methods: {
         sampleTask(data) {
+            const jobOption = {
+              persistent: false,
+            };
             const job = this.addAMQPJob("sample.task", data);
         }
     }
