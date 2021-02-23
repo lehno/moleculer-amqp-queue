@@ -72,6 +72,15 @@ describe("Test AMQPService started handler", () => {
 			},
 			"task.second": {
 				handler: jest.fn(),
+				channel: {
+					assert: {
+						durable: false,
+					},
+					prefetch: 5,
+				},
+				consume: {
+					noAck: true,
+				},
 			},
 		}
 	});
@@ -84,6 +93,17 @@ describe("Test AMQPService started handler", () => {
 	it("should create AMQP connection & queues", () => {
 
 		expect(service.AMQPConn).toBe(mockConnection);
+		expect(service.$queueOptions["task.second"]).toEqual({
+			channel: {
+				assert: {
+					durable: false,
+				},
+				prefetch: 5,
+			},
+			consume: {
+				noAck: true,
+			},
+		});
 
 		expect(service.getAMQPQueue).toHaveBeenCalledTimes(2);
 		expect(service.getAMQPQueue).toHaveBeenCalledWith("task.first");
@@ -91,7 +111,7 @@ describe("Test AMQPService started handler", () => {
 
 		expect(mockChannel.consume).toHaveBeenCalledTimes(2);
 		expect(mockChannel.consume).toHaveBeenCalledWith("task.first", expect.any(Function), { noAck: false });
-		expect(mockChannel.consume).toHaveBeenCalledWith("task.second", expect.any(Function), { noAck: false });
+		expect(mockChannel.consume).toHaveBeenCalledWith("task.second", expect.any(Function), { noAck: true });
 	});
 
 	it("should throw error if URL is not defined", () => {

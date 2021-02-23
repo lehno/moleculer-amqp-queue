@@ -11,7 +11,7 @@ const _ = require("lodash");
 const Errors = require("moleculer").Errors;
 
 const validateOption = function (queueOption) {
-	return _.defaultsDeep({
+	return _.defaultsDeep(queueOption, {
 		channel: {
 			assert: {
 				durable: true,
@@ -21,7 +21,7 @@ const validateOption = function (queueOption) {
 		consume: {
 			noAck: false,
 		},
-	}, queueOption);
+	});
 }
 
 module.exports = {
@@ -55,9 +55,9 @@ module.exports = {
 			return this.$queues[name];
 		},
 		async addAMQPJob(name, message, options) {
-			const jobOption = _.defaultsDeep({
+			const jobOption = _.defaultsDeep(options, {
 				persistent: true,
-			}, options);
+			});
 			let queue = await this.getAMQPQueue(name);
 			queue.sendToQueue(name, Buffer.from(JSON.stringify(message)), jobOption);
 		},
