@@ -34,7 +34,7 @@ module.exports = {
 					this.$queues[name] = channel;
 				} catch (err) {
 					this.logger.error(err);
-					throw(MoleculerError("Unable to start queue"));
+					throw new Errors.MoleculerError("Unable to start queue");
 				}
 			}
 			return this.$queues[name];
