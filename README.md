@@ -18,7 +18,7 @@ const AMQPMixin = require("moleculer-amqp-queue");
 
 broker.createService({
 	name: "task-worker",
-	mixins: [AMQPMixin()],
+	mixins: [AMQPMixin],
 	AMQPQueues: {
 		"sample.task" (channel, msg) {
 			let job = JSON.parse(msg.content.toString());
@@ -37,7 +37,7 @@ const QueueService = require("moleculer-amqp-queue");
 
 broker.createService({
     name: "job-maker",
-    mixins: [QueueService()],
+    mixins: [QueueService],
     methods: {
         sampleTask(data) {
             const job = this.addAMQPJob("sample.task", data);
