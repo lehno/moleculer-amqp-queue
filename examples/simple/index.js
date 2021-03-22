@@ -7,8 +7,8 @@ let broker = new ServiceBroker({ logger: console });
 
 broker.createService({
 	name: "pub",
-	mixins: [AMQPMixin()],
-	started () {
+	mixins: [AMQPMixin],
+	started() {
 		let id = 1;
 		setInterval(async () => {
 			this.logger.info("Add a new job. ID: ", id);
@@ -19,14 +19,25 @@ broker.createService({
 
 broker.createService({
 	name: "task-worker",
-	mixins: [AMQPMixin()],
+	mixins: [AMQPMixin],
 	AMQPQueues: {
-		"sample.task" (channel, msg) {
-			let job = JSON.parse(msg.content.toString());
-			this.logger.info("New job received!", job.id);
-			setTimeout(() => {
-				channel.ack(msg);
-			}, 5000);
+		"sample.task": {
+			handler(channel, msg) {
+				let job = JSON.parse(msg.content.toString());
+				this.logger.info("New job received!", job.id);
+				setTimeout(() => {
+					channel.ack(msg);
+				}, 5000);
+			},
+			channel: {
+				assert: {
+					durable: true,
+				},
+				prefetch: 1,
+			},
+			consume: {
+				noAck: false,
+			},
 		}
 	}
 });

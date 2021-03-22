@@ -7,7 +7,7 @@ let broker = new ServiceBroker({ logger: console });
 
 broker.createService({
 	name: "pub",
-	mixins: [AMQPMixin()],
+	mixins: [AMQPMixin],
 	started () {
 		let id = 1;
 		setInterval(() => {
